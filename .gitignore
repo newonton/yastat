@@ -33,4 +33,4 @@ go.work.sum
 .zed/
 
 # Output
-stats.scv
+stats.csv
