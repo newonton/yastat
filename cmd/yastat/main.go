@@ -100,8 +100,10 @@ func main() {
 			break
 		}
 
-		write(&client, csvFile)
-		last = time.Now().In(timezone.MoscowZone)
+		ok := write(&client, csvFile)
+		if ok {
+			last = time.Now().In(timezone.MoscowZone)
+		}
 	}
 
 	fmt.Println("\nReceived shutdown signal, writing final record...")
@@ -109,9 +111,24 @@ func main() {
 	fmt.Println("Shutdown complete.")
 }
 
-func write(c *api.Client, file string) {
+func write(c *api.Client, file string) bool {
 	shows, reward, _ := c.Fetch()
-	csvstore.Append(file, time.Now().In(timezone.MoscowZone), reward, shows)
+
+	lastRec, ok := csvstore.LastRecord(file)
+
+	deltaShows := shows
+	deltaReward := reward
+	if ok {
+		deltaShows = shows - lastRec.Shows
+		deltaReward = reward - lastRec.Reward
+	}
+
+	if deltaShows == 0 && deltaReward == 0 {
+		return false
+	}
+
+	csvstore.Append(file, time.Now().In(timezone.MoscowZone), shows, reward, deltaShows, deltaReward)
+	return true
 }
 
 func usage() {

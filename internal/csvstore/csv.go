@@ -37,7 +37,55 @@ func LastTime(path string) (time.Time, bool) {
 	return t.Truncate(time.Minute), true
 }
 
-func Append(path string, t time.Time, reward float64, shows int) error {
+type Record struct {
+	Time        time.Time
+	Shows       int
+	Reward      float64
+	DeltaShows  int
+	DeltaReward float64
+}
+
+func LastRecord(path string) (Record, bool) {
+	f, err := os.Open(path)
+	if err != nil {
+		return Record{}, false
+	}
+	defer f.Close()
+
+	r := csv.NewReader(f)
+	var rec []string
+	for {
+		row, err := r.Read()
+		if err != nil {
+			break
+		}
+		rec = row
+	}
+	if len(rec) == 0 {
+		return Record{}, false
+	}
+
+	t, _ := time.ParseInLocation(time.DateTime, rec[0], timezone.MoscowZone)
+	shows, _ := strconv.Atoi(rec[1])
+	reward, _ := strconv.ParseFloat(rec[2], 64)
+
+	var deltaShows int
+	var deltaReward float64
+	if len(rec) >= 5 {
+		deltaShows, _ = strconv.Atoi(rec[3])
+		deltaReward, _ = strconv.ParseFloat(rec[4], 64)
+	}
+
+	return Record{
+		Time:        t.Truncate(time.Minute),
+		Shows:       shows,
+		Reward:      reward,
+		DeltaShows:  deltaShows,
+		DeltaReward: deltaReward,
+	}, true
+}
+
+func Append(path string, t time.Time, shows int, reward float64, deltaShows int, deltaReward float64) error {
 	f, _ := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	defer f.Close()
 
@@ -45,9 +93,11 @@ func Append(path string, t time.Time, reward float64, shows int) error {
 	defer w.Flush()
 
 	return w.Write([]string{
-		t.Format(time.DateTime),
+		t.In(timezone.MoscowZone).Format(time.DateTime),
+		strconv.Itoa(shows),
 		formatFloat(reward),
-		formatInt(shows),
+		strconv.Itoa(deltaShows),
+		formatFloat(deltaReward),
 	})
 }
 
